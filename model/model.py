@@ -82,45 +82,62 @@ class MultiHeadAttentionBlock(nn.Module):
 
         return (attention_scores @ value), attention_scores
 
-def forward(self, q, k, v, mask):
+    def forward(self, q, k, v, mask):
 
-    #(batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
-    query = self.w_q(q)
+        #(batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
+        query = self.w_q(q)
 
-    # (batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
-    key = self.w_k(k)
+        # (batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
+        key = self.w_k(k)
 
-    # (batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
-    value = self.w_v(v)
+        # (batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
+        value = self.w_v(v)
 
-    # (batch, seq_len, dim_model) -->
-    # (batch, seq_len, h , dim_k) --> (batch, seq_len, h , dim_k)
-    #b, sl, dm --> b, sl, h, dm/h --> b, h, sl, dm/h
-    query = query.view(query.shape[0], query.shape[1],\
-                       self.h, self.dim_k).transpose(1,2)
+        # (batch, seq_len, dim_model) -->
+        # (batch, seq_len, h , dim_k) --> (batch, seq_len, h , dim_k)
+        #b, sl, dm --> b, sl, h, dm/h --> b, h, sl, dm/h
+        query = query.view(query.shape[0], query.shape[1],\
+                           self.h, self.dim_k).transpose(1,2)
 
-    key = key.view(key.shape[0], key.shape[1],\
-                       self.h, self.dim_k).transpose(1,2)
+        key = key.view(key.shape[0], key.shape[1],\
+                           self.h, self.dim_k).transpose(1,2)
 
-    value = value.view(value.shape[0], value.shape[1],\
-                       self.h, self.dim_k).transpose(1,2)
+        value = value.view(value.shape[0], value.shape[1],\
+                           self.h, self.dim_k).transpose(1,2)
 
-    #Calculate Attention
-    x, self.attention_scores = MultiHeadAttentionBlock.attention(
-                                                        query,
-                                                        key,
-                                                        value,
-                                                        mask,
-                                                        self.dropout
-                                                        )
-    #Comibine all the heads together
-    # (batch, h, seq_len, dim_k) --> (batch, seq_len, h, dim_k) --> (batch, seq_len, dim_model)
+        #Calculate Attention
+        x, self.attention_scores = MultiHeadAttentionBlock.attention(
+                                                            query,
+                                                            key,
+                                                            value,
+                                                            mask,
+                                                            self.dropout
+                                                            )
+        #Comibine all the heads together
+        # (batch, h, seq_len, dim_k) --> (batch, seq_len, h, dim_k) --> (batch, seq_len, dim_model)
 
-    x = x.transpose(1,2).contigious().view(x.shape[0], -1, self.h * self.dim_k)
-    #batch, h, seq_len, dim_k << transpose
-    #batch, seq_len, h , dim_k << view
-    #batch, -1, h*dim_k
+        x = x.transpose(1,2).contigious().view(x.shape[0], -1, self.h * self.dim_k)
+        #batch, h, seq_len, dim_k << transpose
+        #batch, seq_len, h , dim_k << view
+        #batch, -1, h*dim_k
 
-    #Multiply by Wo
-    #(batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
-    return self.w_o(x)
+        #Multiply by Wo
+        #(batch, seq_len, dim_model) --> (batch, seq_len, dim_model)
+        return self.w_o(x)
+
+class EncoderBlock(nn.Module):
+
+    def __init__(self, self_attention_block: MultiHeadAttentionBlock,
+                 feed_forward_block: FeedForwardBlock,
+                 dropout: nn.Dropout):
+        super().__init__()
+        self.self_attention_block = self_attention_block
+        self.feed_forward_block = feed_forward_block
+        self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(2)])
+
+    def forward(self, x, src_mask):
+        x = self.residual_connections[0](x, lambda x:self.self_attention_block(x, x, x, src_mask))
+        x = self.residual_connections[1](x, self.feed_forward_block)
+        return x
+
+
