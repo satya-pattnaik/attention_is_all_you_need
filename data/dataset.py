@@ -69,7 +69,7 @@ class BilingualDataset(Dataset):
             dim=0
         )
 
-        print("Before",encoder_input.size(0), decoder_input.size(0))
+        #print("Before",encoder_input.size(0), decoder_input.size(0))
         # Add only </s> token
         label = torch.cat(
             [
@@ -80,7 +80,7 @@ class BilingualDataset(Dataset):
             ],
             dim=0,
         )
-        print(encoder_input.size(0),decoder_input.size(0))
+        #print(encoder_input.size(0),decoder_input.size(0))
         #Double check the size of the tensors to make sure they are all seq_long
         assert encoder_input.size(0) == self.seq_len
         assert decoder_input.size(0) == self.seq_len
