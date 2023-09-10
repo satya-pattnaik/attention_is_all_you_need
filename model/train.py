@@ -62,7 +62,7 @@ def greedy_decode(model, source, source_mask, tokenizer_src,tokenizer_tgt, max_l
         return decoder_input.squeeze(0)
 
 def get_all_sentences(ds, lang):
-    print("Get all sentences called")
+
 
     for item in ds:#['train']["translation"]:
 
@@ -89,18 +89,18 @@ def get_ds(config):
 
     #It only has train test split
     ds_raw = load_dataset("opus_books", f"{config['lang_src']}-{config['lang_tgt']}",split='train')
-    print("Here", ds_raw)
+    #print("Here", ds_raw)
     #Build tokenizers
-    print("tokenizer source")
+    #print("tokenizer source")
     tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
-    print("tokenizer target")
+    #print("tokenizer target")
     tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['lang_tgt'])
 
     #Keep 90% for training, 10% for validation
     train_ds_size = int(0.9 * len(ds_raw))
     val_ds_size = len(ds_raw) - train_ds_size
     train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
-    print(train_ds_raw,ds_raw)
+    #print(train_ds_raw,ds_raw)
 
     train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt,
                                 config["lang_src"], config["lang_tgt"], config["seq_len"])
@@ -118,9 +118,9 @@ def get_ds(config):
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
 
-    print(f'Max length of source sentence: {max_len_src}')
-    print(f'Max length of target sentence: {max_len_tgt}')
-    print(next(iter(train_ds.ds)))
+    #print(f'Max length of source sentence: {max_len_src}')
+    #print(f'Max length of target sentence: {max_len_tgt}')
+    #print(next(iter(train_ds.ds)))
     train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
     val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
 
