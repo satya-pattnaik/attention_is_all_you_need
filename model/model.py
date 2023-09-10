@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from layer_normalization import LayerNormalization
+from .layer_normalization  import LayerNormalization
 import math
-from embeddings import InputEmbeddings, PositionalEncoding
+from .embeddings import InputEmbeddings, PositionalEncoding
 class FeedForwardBlock(nn.Module):
 
     def __init__(self,dim_model: int, dim_ff:int, dropout:float):
@@ -45,7 +45,7 @@ class MultiHeadAttentionBlock(nn.Module):
         self.h = h
 
         #Make sure dim_model is divisible by h
-        assert(dim_model % h == 0, "dim_model is not divisible by h")
+        assert dim_model % h == 0, "dim_model is not divisible by h"
 
         #Dimension of vector seen by each head
         self.dim_k = self.dim_model // h
@@ -116,7 +116,7 @@ class MultiHeadAttentionBlock(nn.Module):
         #Comibine all the heads together
         # (batch, h, seq_len, dim_k) --> (batch, seq_len, h, dim_k) --> (batch, seq_len, dim_model)
 
-        x = x.transpose(1,2).contigious().view(x.shape[0], -1, self.h * self.dim_k)
+        x = x.transpose(1,2).contiguous().view(x.shape[0], -1, self.h * self.dim_k)
         #batch, h, seq_len, dim_k << transpose
         #batch, seq_len, h , dim_k << view
         #batch, -1, h*dim_k
@@ -199,6 +199,8 @@ class Transfomer(nn.Module):
                  tgt_embed: InputEmbeddings, src_pos: PositionalEncoding, tgt_pos: PositionalEncoding,
                  projection_layer: ProjectionLayer
                  ):
+        super().__init__()
+
         self.encoder = encoder
         self.decoder = decoder
         self.src_embed = src_embed
@@ -252,7 +254,7 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size:int, src_seq_len: int,
         decoder_self_attention_block = MultiHeadAttentionBlock(dim_model, h, dropout)
         decoder_cross_attention_block = MultiHeadAttentionBlock(dim_model, h, dropout)
         feed_forward_block = FeedForwardBlock(dim_model, dim_ff, dropout)
-        decoder_block = DecoderBlock(decoder_self_attention_block, decoder_cross_attention_block, feed_forward_block)
+        decoder_block = DecoderBlock(decoder_self_attention_block, feed_forward_block, decoder_cross_attention_block, dropout)
         decoder_blocks.append(decoder_block)
 
     #Create the encoder and decoder

@@ -62,8 +62,11 @@ def greedy_decode(model, source, source_mask, tokenizer_src,tokenizer_tgt, max_l
         return decoder_input.squeeze(0)
 
 def get_all_sentences(ds, lang):
-    for item in ds:
-        yield item["translation"]["lang"]
+    print("Get all sentences called")
+
+    for item in ds:#['train']["translation"]:
+
+        yield item["translation"][lang]
 
 def get_or_build_tokenizer(config, ds, lang):
     tokenizer_path = Path(config['tokenizer_file'].format(lang))
@@ -73,7 +76,8 @@ def get_or_build_tokenizer(config, ds, lang):
         tokenizer.pre_tokenizer = Whitespace()
         trainer = WordLevelTrainer(special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"],
                                    min_frequency=2)
-        tokenizer.train_from_iterator(get_all_sentences(), trainer=trainer)
+        #print("Call get all sentences")
+        tokenizer.train_from_iterator(get_all_sentences(ds,lang), trainer=trainer)
         tokenizer.save(str(tokenizer_path))
 
     else:
@@ -84,37 +88,40 @@ def get_or_build_tokenizer(config, ds, lang):
 def get_ds(config):
 
     #It only has train test split
-    ds_raw = load_dataset("opus_books", f"{config['lang_src']}-{config['lang_tgt']}")
-
+    ds_raw = load_dataset("opus_books", f"{config['lang_src']}-{config['lang_tgt']}",split='train')
+    print("Here", ds_raw)
     #Build tokenizers
+    print("tokenizer source")
     tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
+    print("tokenizer target")
     tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['lang_tgt'])
 
     #Keep 90% for training, 10% for validation
     train_ds_size = int(0.9 * len(ds_raw))
     val_ds_size = len(ds_raw) - train_ds_size
     train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+    print(train_ds_raw,ds_raw)
 
     train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt,
-                                config["lang_src"], config["lang_tgt"])
+                                config["lang_src"], config["lang_tgt"], config["seq_len"])
     val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt,
-                              config["lang_src"], config["lang_tgt"])
+                              config["lang_src"], config["lang_tgt"], config["seq_len"])
 
     # Find the maximum length of each sentence in the source and target sentence
     max_len_src = 0
     max_len_tgt = 0
 
     for item in ds_raw:
-        src_ids = tokenizer_src.encode(item['translation'][config['lang_src']]).ids
-        tgt_ids = tokenizer_tgt.encode(item['translation'][config['lang_tgt']]).ids
+        src_ids = tokenizer_src.encode(item["translation"][config['lang_src']]).ids
+        tgt_ids = tokenizer_tgt.encode(item["translation"][config['lang_tgt']]).ids
 
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
 
     print(f'Max length of source sentence: {max_len_src}')
     print(f'Max length of target sentence: {max_len_tgt}')
-
-    train_dataloader = DataLoader(train_ds, batch_size=config['batc_size'], shuffle=True)
+    print(next(iter(train_ds.ds)))
+    train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
     val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
 
     return train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt
@@ -141,7 +148,7 @@ def train_model(config):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
 
-    #If thge user specified a model to preload before training, load it
+    #If the user specified a model to preload before training, load it
     initial_epoch = 0
     global_step = 0
     if config['preload']:
@@ -178,7 +185,7 @@ def train_model(config):
 
             #Compute the loss using a simple cross entropy
             loss = loss_fn(proj_output.view(-1, tokenizer_tgt.get_vocab_size()), label.view(-1))
-            batch_iterator.set_postfix({"loss", f"{loss.item():6.3f}"})
+            batch_iterator.set_postfix({"loss": f"{loss.item():6.3f}"})
 
             #Log the loss
             writer.add_scalar('train loss', loss.item(), global_step)
@@ -209,3 +216,13 @@ def train_model(config):
             },
             model_filename
         )
+
+
+if __name__ == "__main__":
+    from config.config import get_config
+
+    cfg = get_config()
+    cfg['batch_size'] = 6
+    cfg['preload'] = None
+    cfg['num_epochs'] = 5
+    train_model(cfg)
